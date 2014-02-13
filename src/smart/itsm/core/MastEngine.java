@@ -10,6 +10,7 @@ import net.cellcloud.core.Nucleus;
 import net.cellcloud.core.NucleusConfig;
 import net.cellcloud.exception.SingletonException;
 import net.cellcloud.talk.Primitive;
+import net.cellcloud.talk.TalkCapacity;
 import net.cellcloud.talk.TalkListener;
 import net.cellcloud.talk.TalkService;
 import net.cellcloud.talk.TalkServiceFailure;
@@ -70,7 +71,8 @@ public final class MastEngine implements TalkListener {
 			List<Contacts.Address> list = contacts.getAddresses();
 			for (Contacts.Address addr : list) {
 				InetSocketAddress address = new InetSocketAddress(addr.host, addr.port);
-				nucleus.getTalkService().call(addr.identifier, address);
+				TalkCapacity capacity = new TalkCapacity(30, 5000);
+				nucleus.getTalkService().call(addr.identifier, address, capacity);
 			}
 		} catch (SingletonException e) {
 			e.printStackTrace();
