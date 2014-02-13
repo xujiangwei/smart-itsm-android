@@ -1,6 +1,7 @@
 package smart.itsm.core;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -10,6 +11,7 @@ import net.cellcloud.core.NucleusConfig;
 import net.cellcloud.exception.SingletonException;
 import net.cellcloud.talk.Primitive;
 import net.cellcloud.talk.TalkListener;
+import net.cellcloud.talk.TalkService;
 import net.cellcloud.talk.TalkServiceFailure;
 import net.cellcloud.talk.dialect.ActionDialect;
 import android.app.Application;
@@ -22,19 +24,30 @@ public final class MastEngine implements TalkListener {
 
 	private final static MastEngine instance = new MastEngine();
 
-	// Key：Cellet 标识（名称）
+	// 动作监听器 Key：Cellet 标识（名称）
 	private HashMap<String, ListenerSet> listeners;
+	// 故障监听器 Key：Cellet 标识
+	private HashMap<String, List<FailureListener>> failureListeners;
 
 	private MastEngine() {
 		this.listeners = new HashMap<String, ListenerSet>(2);
+		this.failureListeners = new HashMap<String, List<FailureListener>>(2);
 	}
 
 	public static MastEngine getInstance() {
 		return MastEngine.instance;
 	}
 
-	public boolean start(Application app, String host, int port, String[] identifiers) {
-		if (null == identifiers || identifiers.length < 1) {
+	/**
+	 * 启动引擎。
+	 * @param app
+	 * @param host
+	 * @param port
+	 * @param identifiers
+	 * @return
+	 */
+	public boolean start(Application app, Contacts contacts) {
+		if (contacts.getAddresses().isEmpty()) {
 			return false;
 		}
 
@@ -54,9 +67,10 @@ public final class MastEngine implements TalkListener {
 			// 添加监听器
 			nucleus.getTalkService().addListener(this);
 
-			for (String identifier : identifiers) {
-				InetSocketAddress address = new InetSocketAddress(host, port);
-				nucleus.getTalkService().call(identifier, address);
+			List<Contacts.Address> list = contacts.getAddresses();
+			for (Contacts.Address addr : list) {
+				InetSocketAddress address = new InetSocketAddress(addr.host, addr.port);
+				nucleus.getTalkService().call(addr.identifier, address);
 			}
 		} catch (SingletonException e) {
 			e.printStackTrace();
@@ -66,33 +80,99 @@ public final class MastEngine implements TalkListener {
 		return true;
 	}
 
+	/**
+	 * 关闭引擎。
+	 */
 	public void stop() {
 		Nucleus nucleus = Nucleus.getInstance();
 		if (null != nucleus) {
+			nucleus.getTalkService().removeListener(this);
+
 			nucleus.shutdown();
 		}
 	}
 
-	public synchronized void addListener(String cellet, String name, ActionListener listener) {
-		ListenerSet set = this.listeners.get(cellet);
-		if (null != set) {
-			set.add(name, listener);
-		}
-		else {
-			set = new ListenerSet();
-			set.add(name, listener);
-			this.listeners.put(cellet, set);
+	/**
+	 * 添加监听器。
+	 * @param cellet
+	 * @param name
+	 * @param listener
+	 */
+	public void addListener(String cellet, String name, ActionListener listener) {
+		synchronized (this.listeners) {
+			ListenerSet set = this.listeners.get(cellet);
+			if (null != set) {
+				set.add(name, listener);
+			}
+			else {
+				set = new ListenerSet();
+				set.add(name, listener);
+				this.listeners.put(cellet, set);
+			}
 		}
 	}
 
-	public synchronized void removeListener(String cellet, String name, ActionListener listener) {
-		ListenerSet set = this.listeners.get(cellet);
-		if (null != set) {
-			set.remove(name, listener);
-			if (set.isEmpty()) {
-				this.listeners.remove(cellet);
+	/**
+	 * 移除监听器。
+	 * @param cellet
+	 * @param name
+	 * @param listener
+	 */
+	public void removeListener(String cellet, String name, ActionListener listener) {
+		synchronized (this.listeners) {
+			ListenerSet set = this.listeners.get(cellet);
+			if (null != set) {
+				set.remove(name, listener);
+				if (set.isEmpty()) {
+					this.listeners.remove(cellet);
+				}
 			}
 		}
+	}
+
+	/**
+	 * 添加故障监听器。
+	 * @param cellet
+	 * @param listener
+	 */
+	public void addFailureListener(String cellet, FailureListener listener) {
+		synchronized (this.failureListeners) {
+			List<FailureListener> list = this.failureListeners.get(cellet);
+			if (null != list) {
+				list.add(listener);
+			}
+			else {
+				list = new ArrayList<FailureListener>(2);
+				list.add(listener);
+				this.failureListeners.put(cellet, list);
+			}
+		}
+	}
+
+	/**
+	 * 删除故障监听器。
+	 * @param cellet
+	 * @param listener
+	 */
+	public void removeFailureListener(String cellet, FailureListener listener) {
+		synchronized (this.failureListeners) {
+			List<FailureListener> list = this.failureListeners.get(cellet);
+			if (null != list) {
+				list.remove(listener);
+				if (list.isEmpty()) {
+					this.failureListeners.remove(cellet);
+				}
+			}
+		}
+	}
+
+	/**
+	 * 执行动作。
+	 * @param cellet
+	 * @param action
+	 */
+	public void performAction(String identifier, ActionDialect action) {
+		TalkService.getInstance().talk(identifier, action);
 	}
 
 	@Override
@@ -125,17 +205,27 @@ public final class MastEngine implements TalkListener {
 
 	@Override
 	public void contacted(String identifier, String tag) {
-		// TODO
+		Logger.d(MastEngine.class, "contacted @" + identifier);
 	}
 
 	@Override
 	public void quitted(String identifier, String tag) {
-		// TODO
+		Logger.d(MastEngine.class, "quitted @" + identifier);
 	}
 
 	@Override
 	public void failed(String identifier, String tag, TalkServiceFailure failure) {
-		// TODO
+		if (Logger.isDebugLevel()) {
+			Logger.d(MastEngine.class, "Failed @" + identifier);
+		}
+
+		List<FailureListener> list = this.failureListeners.get(identifier);
+		if (null != list) {
+			Failure f = new Failure(failure);
+			for (FailureListener listener : list) {
+				listener.onFailed(f);
+			}
+		}
 	}
 
 	@Override
