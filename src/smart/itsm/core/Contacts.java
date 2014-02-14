@@ -11,18 +11,18 @@ import java.util.List;
  */
 public final class Contacts {
 
-	private ArrayList<Address> address;
+	private ArrayList<Address> addresses;
 
 	public Contacts() {
-		this.address = new ArrayList<Address>(2);
+		this.addresses = new ArrayList<Address>(2);
 	}
 
 	public void addAddress(String identifier, String host, int port) {
-		this.address.add(new Address(identifier, host, port));
+		this.addresses.add(new Address(identifier, host, port));
 	}
 
 	protected List<Address> getAddresses() {
-		return this.address;
+		return this.addresses;
 	}
 
 	/**

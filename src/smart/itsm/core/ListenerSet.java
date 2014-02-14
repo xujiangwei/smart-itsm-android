@@ -38,7 +38,7 @@ public final class ListenerSet {
 		}
 	}
 
-	public List<ActionListener> getListener(String name) {
+	public List<ActionListener> getListeners(String name) {
 		return this.listeners.get(name);
 	}
 

@@ -57,26 +57,26 @@ public final class MastEngine implements TalkListener {
 		config.device = NucleusConfig.Device.PHONE;
 		config.talk.block = 10240;
 
+		Nucleus nucleus = null;
 		try {
-			Nucleus nucleus = new Nucleus(config, app);
-
-			// 启动 CC 内核
-			if (!nucleus.startup()) {
-				return false;
-			}
-
-			// 添加监听器
-			nucleus.getTalkService().addListener(this);
-
-			List<Contacts.Address> list = contacts.getAddresses();
-			for (Contacts.Address addr : list) {
-				InetSocketAddress address = new InetSocketAddress(addr.host, addr.port);
-				TalkCapacity capacity = new TalkCapacity(30, 5000);
-				nucleus.getTalkService().call(addr.identifier, address, capacity);
-			}
+			nucleus = Nucleus.createInstance(config, app);
 		} catch (SingletonException e) {
-			e.printStackTrace();
+			nucleus = Nucleus.getInstance();
+		}
+
+		// 启动 CC 内核
+		if (!nucleus.startup()) {
 			return false;
+		}
+
+		// 添加监听器
+		nucleus.getTalkService().addListener(this);
+
+		List<Contacts.Address> list = contacts.getAddresses();
+		for (Contacts.Address addr : list) {
+			InetSocketAddress address = new InetSocketAddress(addr.host, addr.port);
+			TalkCapacity capacity = new TalkCapacity(30, 5000);
+			nucleus.getTalkService().call(addr.identifier, address, capacity);
 		}
 
 		return true;
@@ -195,7 +195,7 @@ public final class MastEngine implements TalkListener {
 			// 分发动作
 			ListenerSet set = this.listeners.get(identifier);
 			if (null != set) {
-				List<ActionListener> list = set.getListener(action.getAction());
+				List<ActionListener> list = set.getListeners(action.getAction());
 				if (null != list) {
 					for (ActionListener listener : list) {
 						listener.onAction(action);
