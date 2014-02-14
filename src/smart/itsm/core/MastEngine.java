@@ -28,11 +28,11 @@ public final class MastEngine implements TalkListener {
 	// 动作监听器 Key：Cellet 标识（名称）
 	private HashMap<String, ListenerSet> listeners;
 	// 故障监听器 Key：Cellet 标识
-	private HashMap<String, List<FailureListener>> failureListeners;
+	private HashMap<String, List<StatusListener>> statusListeners;
 
 	private MastEngine() {
 		this.listeners = new HashMap<String, ListenerSet>(2);
-		this.failureListeners = new HashMap<String, List<FailureListener>>(2);
+		this.statusListeners = new HashMap<String, List<StatusListener>>(2);
 	}
 
 	public static MastEngine getInstance() {
@@ -133,36 +133,36 @@ public final class MastEngine implements TalkListener {
 	}
 
 	/**
-	 * 添加故障监听器。
+	 * 添加状态监听器。
 	 * @param cellet
 	 * @param listener
 	 */
-	public void addFailureListener(String cellet, FailureListener listener) {
-		synchronized (this.failureListeners) {
-			List<FailureListener> list = this.failureListeners.get(cellet);
+	public void addStatusListener(String cellet, StatusListener listener) {
+		synchronized (this.statusListeners) {
+			List<StatusListener> list = this.statusListeners.get(cellet);
 			if (null != list) {
 				list.add(listener);
 			}
 			else {
-				list = new ArrayList<FailureListener>(2);
+				list = new ArrayList<StatusListener>(2);
 				list.add(listener);
-				this.failureListeners.put(cellet, list);
+				this.statusListeners.put(cellet, list);
 			}
 		}
 	}
 
 	/**
-	 * 删除故障监听器。
+	 * 删除状态监听器。
 	 * @param cellet
 	 * @param listener
 	 */
-	public void removeFailureListener(String cellet, FailureListener listener) {
-		synchronized (this.failureListeners) {
-			List<FailureListener> list = this.failureListeners.get(cellet);
+	public void removeStatusListener(String cellet, StatusListener listener) {
+		synchronized (this.statusListeners) {
+			List<StatusListener> list = this.statusListeners.get(cellet);
 			if (null != list) {
 				list.remove(listener);
 				if (list.isEmpty()) {
-					this.failureListeners.remove(cellet);
+					this.statusListeners.remove(cellet);
 				}
 			}
 		}
@@ -173,8 +173,8 @@ public final class MastEngine implements TalkListener {
 	 * @param cellet
 	 * @param action
 	 */
-	public void performAction(String identifier, ActionDialect action) {
-		TalkService.getInstance().talk(identifier, action);
+	public boolean performAction(String identifier, ActionDialect action) {
+		return TalkService.getInstance().talk(identifier, action);
 	}
 
 	@Override
@@ -207,25 +207,43 @@ public final class MastEngine implements TalkListener {
 
 	@Override
 	public void contacted(String identifier, String tag) {
-		Logger.d(MastEngine.class, "contacted @" + identifier);
+		if (Logger.isDebugLevel()) {
+			Logger.d(MastEngine.class, "contacted @" + identifier);
+		}
+
+		List<StatusListener> list = this.statusListeners.get(identifier);
+		if (null != list) {
+			for (StatusListener listener : list) {
+				listener.onConnected(identifier);
+			}
+		}
 	}
 
 	@Override
 	public void quitted(String identifier, String tag) {
-		Logger.d(MastEngine.class, "quitted @" + identifier);
+		if (Logger.isDebugLevel()) {
+			Logger.d(MastEngine.class, "quitted @" + identifier);
+		}
+
+		List<StatusListener> list = this.statusListeners.get(identifier);
+		if (null != list) {
+			for (StatusListener listener : list) {
+				listener.onDisconnected(identifier);
+			}
+		}
 	}
 
 	@Override
 	public void failed(String identifier, String tag, TalkServiceFailure failure) {
 		if (Logger.isDebugLevel()) {
-			Logger.d(MastEngine.class, "Failed @" + identifier);
+			Logger.d(MastEngine.class, "failed @" + identifier);
 		}
 
-		List<FailureListener> list = this.failureListeners.get(identifier);
+		List<StatusListener> list = this.statusListeners.get(identifier);
 		if (null != list) {
 			Failure f = new Failure(failure);
-			for (FailureListener listener : list) {
-				listener.onFailed(f);
+			for (StatusListener listener : list) {
+				listener.onFailed(identifier, f);
 			}
 		}
 	}

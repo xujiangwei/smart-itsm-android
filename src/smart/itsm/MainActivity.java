@@ -68,7 +68,7 @@ public class MainActivity extends Activity {
 		// 监听来自 Dummy 的动作
 		mast.addListener("Dummy", DummyListener.ACTION_NAME, listener);
 		// 监听来自 ServiceDesk 的错误
-		mast.addFailureListener(SD, listener);
+		mast.addStatusListener(SD, listener);
 
 		// 对于不存在的 Cellet 访问或者地址和端口不正确的访问，
 		// 通过加入故障监听器来获得错误信息。

@@ -9,7 +9,9 @@ import android.widget.EditText;
 public class LogHandler extends Handler {
 
 	protected static final int MSG_ACTION = 1;
-	protected static final int MSG_FAILURE = 2;
+	protected static final int MSG_CONNECT = 2;
+	protected static final int MSG_DISCONNECT = 3;
+	protected static final int MSG_FAILURE = 5;
 
 	private EditText editText;
 
@@ -25,6 +27,12 @@ public class LogHandler extends Handler {
 			this.editText.append("[I] Action: " + action.getAction() + "\n");
 			this.editText.append("    N: " + action.getAction() + "\n");
 			this.editText.append("    V: " + action.getParamAsInt("random") + "\n");
+			break;
+		case MSG_CONNECT:
+			this.editText.append("[I] Connect: " + msg.obj + "\n");
+			break;
+		case MSG_DISCONNECT:
+			this.editText.append("[I] Disconnect: " + msg.obj + "\n");
 			break;
 		case MSG_FAILURE:
 			Failure failure = (Failure) msg.obj;
