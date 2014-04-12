@@ -1,5 +1,6 @@
 package smart.itsm.core;
 
+import net.cellcloud.talk.TalkFailureCode;
 import net.cellcloud.talk.TalkServiceFailure;
 
 /**
@@ -10,7 +11,7 @@ import net.cellcloud.talk.TalkServiceFailure;
  */
 public class Failure {
 
-	private int code;
+	private TalkFailureCode code;
 	private String description;
 	private String reason;
 
@@ -20,7 +21,7 @@ public class Failure {
 		this.reason = tsf.getReason();
 	}
 
-	public int getCode() {
+	public TalkFailureCode getCode() {
 		return this.code;
 	}
 

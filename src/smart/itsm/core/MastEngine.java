@@ -4,6 +4,8 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import net.cellcloud.common.Logger;
 import net.cellcloud.core.Nucleus;
@@ -11,6 +13,7 @@ import net.cellcloud.core.NucleusConfig;
 import net.cellcloud.exception.SingletonException;
 import net.cellcloud.talk.Primitive;
 import net.cellcloud.talk.TalkCapacity;
+import net.cellcloud.talk.TalkFailureCode;
 import net.cellcloud.talk.TalkListener;
 import net.cellcloud.talk.TalkService;
 import net.cellcloud.talk.TalkServiceFailure;
@@ -27,12 +30,16 @@ public final class MastEngine implements TalkListener {
 
 	// 动作监听器 Key：Cellet 标识（名称）
 	private HashMap<String, ListenerSet> listeners;
-	// 故障监听器 Key：Cellet 标识
+	// 状态监听器 Key：Cellet 标识
 	private HashMap<String, List<StatusListener>> statusListeners;
+
+	// 通信地址表
+	private HashMap<String, Contact> contacts;
 
 	private MastEngine() {
 		this.listeners = new HashMap<String, ListenerSet>(2);
 		this.statusListeners = new HashMap<String, List<StatusListener>>(2);
+		this.contacts = new HashMap<String, Contact>(2);
 	}
 
 	public static MastEngine getInstance() {
@@ -42,26 +49,21 @@ public final class MastEngine implements TalkListener {
 	/**
 	 * 启动引擎。
 	 * @param app
-	 * @param host
-	 * @param port
-	 * @param identifiers
 	 * @return
 	 */
-	public boolean start(Application app, Contacts contacts) {
-		if (contacts.getAddresses().isEmpty()) {
-			return false;
-		}
+	public boolean start(Application app) {
+		Nucleus nucleus = Nucleus.getInstance();
+		if (null == nucleus) {
+			NucleusConfig config = new NucleusConfig();
+			config.role = NucleusConfig.Role.CONSUMER;
+			config.device = NucleusConfig.Device.PHONE;
+			config.talk.block = 10240;
 
-		NucleusConfig config = new NucleusConfig();
-		config.role = NucleusConfig.Role.CONSUMER;
-		config.device = NucleusConfig.Device.PHONE;
-		config.talk.block = 10240;
-
-		Nucleus nucleus = null;
-		try {
-			nucleus = Nucleus.createInstance(config, app);
-		} catch (SingletonException e) {
-			nucleus = Nucleus.getInstance();
+			try {
+				nucleus = Nucleus.createInstance(config, app);
+			} catch (SingletonException e) {
+				nucleus = Nucleus.getInstance();
+			}
 		}
 
 		// 启动 CC 内核
@@ -71,13 +73,6 @@ public final class MastEngine implements TalkListener {
 
 		// 添加监听器
 		nucleus.getTalkService().addListener(this);
-
-		List<Contacts.Address> list = contacts.getAddresses();
-		for (Contacts.Address addr : list) {
-			InetSocketAddress address = new InetSocketAddress(addr.host, addr.port);
-			TalkCapacity capacity = new TalkCapacity(30, 5000);
-			nucleus.getTalkService().call(addr.identifier, address, capacity);
-		}
 
 		return true;
 	}
@@ -95,20 +90,58 @@ public final class MastEngine implements TalkListener {
 	}
 
 	/**
+	 * 添加服务器联系人。
+	 * @param contact
+	 */
+	public void addContact(Contact contact) {
+		this.contacts.put(contact.identifier, contact);
+	}
+
+	/**
+	 * 删除服务器联系人。
+	 * @param contact
+	 */
+	public void removeContact(Contact contact) {
+		this.contacts.remove(contact.identifier);
+	}
+
+	/**
+	 * 重置联系服务器。
+	 */
+	public void resetContacts() {
+		Set<Map.Entry<String, Contact>> list = this.contacts.entrySet();
+		for (Map.Entry<String, Contact> e : list) {
+			Contact contact = e.getValue();
+			if (Nucleus.getInstance().getTalkService().isCalled(contact.identifier)) {
+				Nucleus.getInstance().getTalkService().hangUp(contact.identifier);
+			}
+		}
+
+		list = this.contacts.entrySet();
+		for (Map.Entry<String, Contact> e : list) {
+			Contact contact = e.getValue();
+			InetSocketAddress address = new InetSocketAddress(contact.address, contact.port);
+			// 设置自动重试次数和重试间隔
+			TalkCapacity capacity = new TalkCapacity(3, 5000);
+			Nucleus.getInstance().getTalkService().call(contact.identifier, address, capacity);
+		}
+	}
+
+	/**
 	 * 添加监听器。
 	 * @param cellet
 	 * @param name
 	 * @param listener
 	 */
-	public void addListener(String cellet, String name, ActionListener listener) {
+	public void addListener(String cellet, ActionListener listener) {
 		synchronized (this.listeners) {
 			ListenerSet set = this.listeners.get(cellet);
 			if (null != set) {
-				set.add(name, listener);
+				set.add(listener.getAction(), listener);
 			}
 			else {
 				set = new ListenerSet();
-				set.add(name, listener);
+				set.add(listener.getAction(), listener);
 				this.listeners.put(cellet, set);
 			}
 		}
@@ -120,11 +153,11 @@ public final class MastEngine implements TalkListener {
 	 * @param name
 	 * @param listener
 	 */
-	public void removeListener(String cellet, String name, ActionListener listener) {
+	public void removeListener(String cellet, ActionListener listener) {
 		synchronized (this.listeners) {
 			ListenerSet set = this.listeners.get(cellet);
 			if (null != set) {
-				set.remove(name, listener);
+				set.remove(listener.getAction(), listener);
 				if (set.isEmpty()) {
 					this.listeners.remove(cellet);
 				}
@@ -245,6 +278,12 @@ public final class MastEngine implements TalkListener {
 			for (StatusListener listener : list) {
 				listener.onFailed(identifier, f);
 			}
+		}
+
+		if (failure.getCode() == TalkFailureCode.NO_NETWORK
+			|| failure.getCode() == TalkFailureCode.NOTFOUND_CELLET
+			|| failure.getCode() == TalkFailureCode.RETRY_END) {
+			// TODO 这3个错误码，Cell Cloud 不会进行自动重连
 		}
 	}
 
