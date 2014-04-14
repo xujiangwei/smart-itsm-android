@@ -112,9 +112,7 @@ public final class MastEngine implements TalkListener {
 		Set<Map.Entry<String, Contact>> list = this.contacts.entrySet();
 		for (Map.Entry<String, Contact> e : list) {
 			Contact contact = e.getValue();
-			if (Nucleus.getInstance().getTalkService().isCalled(contact.identifier)) {
-				Nucleus.getInstance().getTalkService().hangUp(contact.identifier);
-			}
+			Nucleus.getInstance().getTalkService().hangUp(contact.identifier);
 		}
 
 		list = this.contacts.entrySet();
