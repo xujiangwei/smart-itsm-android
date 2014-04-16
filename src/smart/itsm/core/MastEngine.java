@@ -119,9 +119,7 @@ public final class MastEngine implements TalkListener {
 		for (Map.Entry<String, Contact> e : list) {
 			Contact contact = e.getValue();
 			InetSocketAddress address = new InetSocketAddress(contact.address, contact.port);
-			// 设置自动重试次数和重试间隔
-			TalkCapacity capacity = new TalkCapacity(3, 5000);
-			Nucleus.getInstance().getTalkService().call(contact.identifier, address, capacity);
+			Nucleus.getInstance().getTalkService().call(contact.identifier, address);
 		}
 	}
 
