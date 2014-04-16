@@ -62,11 +62,11 @@ public class DemoHandler extends Handler {
 				mBtnPerform.setEnabled(false);
 			}
 			else if (failure.getCode() == TalkFailureCode.CALL_FAILED) {
-				mEtLog.append("[T] Call cellet 失败，进行自动重连...\n");
+				mEtLog.append("[T] Call cellet 失败\n");
 				mBtnPerform.setEnabled(false);
 			}
 			else if (failure.getCode() == TalkFailureCode.TALK_LOST) {
-				mEtLog.append("[T] 丢失连接，进行自动重连...\n");
+				mEtLog.append("[T] 丢失连接\n");
 				mBtnPerform.setEnabled(false);
 			}
 			else {
