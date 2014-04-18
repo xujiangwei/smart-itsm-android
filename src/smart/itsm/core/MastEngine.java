@@ -12,6 +12,7 @@ import net.cellcloud.core.Nucleus;
 import net.cellcloud.core.NucleusConfig;
 import net.cellcloud.exception.SingletonException;
 import net.cellcloud.talk.Primitive;
+import net.cellcloud.talk.TalkCapacity;
 import net.cellcloud.talk.TalkFailureCode;
 import net.cellcloud.talk.TalkListener;
 import net.cellcloud.talk.TalkService;
@@ -108,6 +109,15 @@ public final class MastEngine implements TalkListener {
 	 * 重置联系服务器。
 	 */
 	public void resetContacts() {
+		this.resetContacts(0, 5000);
+	}
+
+	/**
+	 * 重置联系服务器。
+	 * @param retryAttempts 指定断线重试连接次数
+	 * @param retryDelay 指定重试连接的重试延迟
+	 */
+	public void resetContacts(int retryAttempts, long retryDelay) {
 		Set<Map.Entry<String, Contact>> list = this.contacts.entrySet();
 		for (Map.Entry<String, Contact> e : list) {
 			Contact contact = e.getValue();
@@ -118,7 +128,13 @@ public final class MastEngine implements TalkListener {
 		for (Map.Entry<String, Contact> e : list) {
 			Contact contact = e.getValue();
 			InetSocketAddress address = new InetSocketAddress(contact.address, contact.port);
-			Nucleus.getInstance().getTalkService().call(contact.identifier, address);
+			if (retryAttempts > 0) {
+				TalkCapacity capacity = new TalkCapacity(retryAttempts, retryDelay);
+				Nucleus.getInstance().getTalkService().call(contact.identifier, address, capacity);
+			}
+			else {
+				Nucleus.getInstance().getTalkService().call(contact.identifier, address);
+			}
 		}
 	}
 
