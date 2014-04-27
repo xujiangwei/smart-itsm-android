@@ -17,12 +17,12 @@ public class DemoHandler extends Handler {
 	protected static final int MSG_FAILURE = 5;
 
 	private EditText mEtLog;
-	private Button mBtnReset;
+	private Button mBtnContact;
 	private Button mBtnPerform;
 
 	public DemoHandler(View view) {
 		mEtLog = (EditText) view.findViewById(R.id.et_log);
-		mBtnReset = (Button) view.findViewById(R.id.btn_reset);
+		mBtnContact = (Button) view.findViewById(R.id.btn_contact);
 		mBtnPerform = (Button) view.findViewById(R.id.btn_perform);
 	}
 
@@ -38,7 +38,7 @@ public class DemoHandler extends Handler {
 		case MSG_CONNECT:
 			mEtLog.append("[I] Connect: " + msg.obj + "\n");
 			mBtnPerform.setEnabled(true);
-			mBtnReset.setEnabled(false);
+			mBtnContact.setEnabled(false);
 			break;
 		case MSG_DISCONNECT:
 			mEtLog.append("[I] Disconnect: " + msg.obj + "\n");
@@ -48,21 +48,22 @@ public class DemoHandler extends Handler {
 			mEtLog.append("[F] Failed #" + failure.getCode().getCode() + " - " + failure.getDescription() + "\n");
 			if (failure.getCode() == TalkFailureCode.NO_NETWORK) {
 				mEtLog.append("[T] 无可用网络\n");
-				mBtnReset.setEnabled(true);
+				mBtnContact.setEnabled(true);
 				mBtnPerform.setEnabled(false);
 			}
 			else if (failure.getCode() == TalkFailureCode.NOTFOUND_CELLET) {
 				mEtLog.append("[T] 未找到指定的 Cellet\n");
-				mBtnReset.setEnabled(true);
+				mBtnContact.setEnabled(true);
 				mBtnPerform.setEnabled(false);
 			}
 			else if (failure.getCode() == TalkFailureCode.RETRY_END) {
 				mEtLog.append("[T] 达到最大重试次数，重试结束\n");
-				mBtnReset.setEnabled(true);
+				mBtnContact.setEnabled(true);
 				mBtnPerform.setEnabled(false);
 			}
 			else if (failure.getCode() == TalkFailureCode.CALL_FAILED) {
 				mEtLog.append("[T] Call cellet 失败\n");
+				mBtnContact.setEnabled(true);
 				mBtnPerform.setEnabled(false);
 			}
 			else if (failure.getCode() == TalkFailureCode.TALK_LOST) {

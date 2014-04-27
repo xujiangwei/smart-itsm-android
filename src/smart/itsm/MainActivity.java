@@ -83,9 +83,6 @@ public class MainActivity extends ActionBarActivity implements
 
 		// 启动
 		MastEngine.getInstance().start(this.getApplication());
-
-		// 以下为演示代码
-		MastEngine.getInstance().addContact(new Contact("Dummy", "192.168.2.3", 7000));
 	}
 
 	@Override
@@ -189,7 +186,7 @@ public class MainActivity extends ActionBarActivity implements
 		private static final String ARG_SECTION_NUMBER = "section_number";
 
 		private EditText mEtLog;
-		private Button mBtnReset;
+		private Button mBtnContact;
 		private Button mBtnPerform;
 		private DemoListener mListener;
 
@@ -214,14 +211,14 @@ public class MainActivity extends ActionBarActivity implements
 
 			// 显示简单的日志信息
 			mEtLog = (EditText) rootView.findViewById(R.id.et_log);
-			mBtnReset = (Button) rootView.findViewById(R.id.btn_reset);
+			mBtnContact = (Button) rootView.findViewById(R.id.btn_contact);
 			mBtnPerform = (Button) rootView.findViewById(R.id.btn_perform);
 			mBtnPerform.setEnabled(false);
 
-			mBtnReset.setOnClickListener(new OnClickListener() {
+			mBtnContact.setOnClickListener(new OnClickListener() {
 				@Override
 				public void onClick(View v) {
-					onBtnResetClick();
+					onBtnContactClick();
 				}
 			});
 			mBtnPerform.setOnClickListener(new OnClickListener() {
@@ -237,7 +234,7 @@ public class MainActivity extends ActionBarActivity implements
 			mListener = new DemoListener(handler);
 
 			// 添加监听器
-			MastEngine.getInstance().addListener("Dummy", mListener);
+			MastEngine.getInstance().addActionListener("Dummy", mListener);
 			MastEngine.getInstance().addStatusListener("Dummy", mListener);
 			//---- Demo End ----
 
@@ -251,17 +248,18 @@ public class MainActivity extends ActionBarActivity implements
 			// 演示代码，仅能用于特性演示
 			//---- Demo Begin ----
 			// 移除监听器
-			MastEngine.getInstance().removeListener("Dummy", mListener);
+			MastEngine.getInstance().removeActionListener("Dummy", mListener);
 			MastEngine.getInstance().removeStatusListener("Dummy", mListener);
 			//---- Demo End ----
 		}
 
-		private void onBtnResetClick() {
-			mEtLog.append("[I] 重置服务器信息，开始连接服务器...\n");
+		private void onBtnContactClick() {
+			mEtLog.append("[I] 连接服务器...\n");
 
-			MastEngine.getInstance().resetContacts();
+			// 以下为演示代码
+			MastEngine.getInstance().contactCellet(new Contact("Dummy", "192.168.1.106", 7000), false);
 
-			mBtnReset.setEnabled(false);
+			mBtnContact.setEnabled(false);
 		}
 
 		private void onBtnPerformClick() {

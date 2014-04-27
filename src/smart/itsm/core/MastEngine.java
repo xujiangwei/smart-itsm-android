@@ -4,8 +4,6 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import net.cellcloud.common.Logger;
 import net.cellcloud.core.Nucleus;
@@ -21,6 +19,7 @@ import net.cellcloud.talk.dialect.ActionDialect;
 import android.app.Application;
 
 /**
+ * 引擎根类。
  * 
  * @author Jiangwei Xu
  */
@@ -29,17 +28,16 @@ public final class MastEngine implements TalkListener {
 	private final static MastEngine instance = new MastEngine();
 
 	// 动作监听器 Key：Cellet 标识（名称）
-	private HashMap<String, ListenerSet> listeners;
+	private HashMap<String, ListenerSet> actionListeners;
 	// 状态监听器 Key：Cellet 标识
 	private HashMap<String, List<StatusListener>> statusListeners;
 
-	// 通信地址表
-	private HashMap<String, Contact> contacts;
+	private volatile boolean started;
 
 	private MastEngine() {
-		this.listeners = new HashMap<String, ListenerSet>(2);
+		this.actionListeners = new HashMap<String, ListenerSet>(2);
 		this.statusListeners = new HashMap<String, List<StatusListener>>(2);
-		this.contacts = new HashMap<String, Contact>(2);
+		this.started = false;
 	}
 
 	public static MastEngine getInstance() {
@@ -52,6 +50,12 @@ public final class MastEngine implements TalkListener {
 	 * @return
 	 */
 	public boolean start(Application app) {
+		if (this.started) {
+			return true;
+		}
+
+		this.started = true;
+
 		Nucleus nucleus = Nucleus.getInstance();
 		if (null == nucleus) {
 			NucleusConfig config = new NucleusConfig();
@@ -81,96 +85,101 @@ public final class MastEngine implements TalkListener {
 	 * 关闭引擎。
 	 */
 	public void stop() {
+		if (!this.started) {
+			return;
+		}
+
 		Nucleus nucleus = Nucleus.getInstance();
 		if (null != nucleus) {
 			nucleus.getTalkService().removeListener(this);
 
 			nucleus.shutdown();
 		}
+
+		this.started = false;
 	}
 
 	/**
-	 * 添加服务器联系人。
+	 * 引擎是否已启动。
+	 * @return
+	 */
+	public boolean hasStarted() {
+		return this.started;
+	}
+
+	/**
+	 * 连接 Cellet 。
 	 * @param contact
+	 * @param reconnection
+	 * @return
 	 */
-	public void addContact(Contact contact) {
-		this.contacts.put(contact.identifier, contact);
+	public boolean contactCellet(Contact contact, boolean reconnection) {
+		return this.contactCellet(contact, 0, 5000, reconnection);
 	}
 
 	/**
-	 * 删除服务器联系人。
+	 * 连接 Cellet 。
 	 * @param contact
+	 * @param retryAttempts
+	 * @param retryDelay
+	 * @param reconnection
+	 * @return
 	 */
-	public void removeContact(Contact contact) {
-		this.contacts.remove(contact.identifier);
-	}
-
-	/**
-	 * 重置联系服务器。
-	 */
-	public void resetContacts() {
-		this.resetContacts(0, 5000);
-	}
-
-	/**
-	 * 重置联系服务器。
-	 * @param retryAttempts 指定断线重试连接次数
-	 * @param retryDelay 指定重试连接的重试延迟
-	 */
-	public void resetContacts(int retryAttempts, long retryDelay) {
-		Set<Map.Entry<String, Contact>> list = this.contacts.entrySet();
-		for (Map.Entry<String, Contact> e : list) {
-			Contact contact = e.getValue();
-			Nucleus.getInstance().getTalkService().hangUp(contact.identifier);
+	public boolean contactCellet(Contact contact, int retryAttempts, long retryDelay, boolean reconnection) {
+		TalkService ts = Nucleus.getInstance().getTalkService();
+		if (reconnection) {
+			// 强制重连，先断开
+			ts.hangUp(contact.identifier);
 		}
 
-		list = this.contacts.entrySet();
-		for (Map.Entry<String, Contact> e : list) {
-			Contact contact = e.getValue();
-			InetSocketAddress address = new InetSocketAddress(contact.address, contact.port);
-			if (retryAttempts > 0) {
-				TalkCapacity capacity = new TalkCapacity(retryAttempts, retryDelay);
-				Nucleus.getInstance().getTalkService().call(contact.identifier, address, capacity);
-			}
-			else {
-				Nucleus.getInstance().getTalkService().call(contact.identifier, address);
-			}
+		if (!reconnection && ts.isCalled(contact.identifier)) {
+			// 不是强制重连，并且已经 Call 了 Cellet，则返回
+			return true;
+		}
+
+		InetSocketAddress address = new InetSocketAddress(contact.address, contact.port);
+		if (retryAttempts > 0) {
+			TalkCapacity capacity = new TalkCapacity(retryAttempts, retryDelay);
+			return ts.call(contact.identifier, address, capacity);
+		}
+		else {
+			return ts.call(contact.identifier, address);
 		}
 	}
 
 	/**
-	 * 添加监听器。
+	 * 添加动作监听器。
 	 * @param cellet
 	 * @param name
 	 * @param listener
 	 */
-	public void addListener(String cellet, ActionListener listener) {
-		synchronized (this.listeners) {
-			ListenerSet set = this.listeners.get(cellet);
+	public void addActionListener(String cellet, ActionListener listener) {
+		synchronized (this.actionListeners) {
+			ListenerSet set = this.actionListeners.get(cellet);
 			if (null != set) {
 				set.add(listener.getAction(), listener);
 			}
 			else {
 				set = new ListenerSet();
 				set.add(listener.getAction(), listener);
-				this.listeners.put(cellet, set);
+				this.actionListeners.put(cellet, set);
 			}
 		}
 	}
 
 	/**
-	 * 移除监听器。
+	 * 移除动作监听器。
 	 * @param cellet
 	 * @param name
 	 * @param listener
 	 */
-	public void removeListener(String cellet, ActionListener listener) {
-		synchronized (this.listeners) {
-			ListenerSet set = this.listeners.get(cellet);
+	public void removeActionListener(String cellet, ActionListener listener) {
+		synchronized (this.actionListeners) {
+			ListenerSet set = this.actionListeners.get(cellet);
 			if (null != set) {
 				set.remove(listener.getAction(), listener);
 				if (set.isEmpty()) {
-					this.listeners.remove(cellet);
+					this.actionListeners.remove(cellet);
 				}
 			}
 		}
@@ -235,9 +244,9 @@ public final class MastEngine implements TalkListener {
 
 		ActionDialect action = (ActionDialect) primitive.getDialect();
 
-		synchronized (this.listeners) {
+		synchronized (this.actionListeners) {
 			// 分发动作
-			ListenerSet set = this.listeners.get(identifier);
+			ListenerSet set = this.actionListeners.get(identifier);
 			if (null != set) {
 				List<ActionListener> list = set.getListeners(action.getAction());
 				if (null != list) {
